@@ -45,7 +45,16 @@ async def analisar_contrato(
     except Exception as e:
         return JSONResponse(status_code=500, content={"erro": f"Falha ao enviar e-mail: {str(e)}"})
 
+
     finally:
         os.remove(temp_path)
 
-    return {"mensagem": "Análise enviada por e-mail com sucesso!"}
+    return {"mensagem": "Análise enviada por e-mail com sucesso! Não esqueça de olhar na sua caixa de entrada e na caixa de spam."}
+
+"""
+Comandos para publicar alterações no GitHub:
+
+git add main.py
+git commit -m "Atualiza mensagem de retorno com aviso sobre spam"
+git push origin main  # ou a branch que estiver usando
+"""
