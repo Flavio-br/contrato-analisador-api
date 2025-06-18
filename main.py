@@ -32,7 +32,7 @@ async def analisar_contrato(
     Prompt += "4. sugira as alterações necessárias para garantir que a parte envolvida não tenha prejusizo "
     Prompt += "5. altere as clausulas que entende necessarias indicando a sua substituição"
     Prompt += "6. inclua as clausulas que entede necessárias para garantir que a parte envolvida não tenha prejusizo "
-    Prompt += "5. sua resposta deve vir adequada para envio de email"
+    Prompt += "5. sua resposta deve vir adequada para envio em html"
     #resposta_ia += processar_pdf_com_gemini(f"Analise Esse Contrato\n\n {parte}: {nome}", temp_path) # \n\n Vendedora: MRV ENGENHARIA
     resposta_ia += processar_pdf_com_gemini(f"{Prompt}", temp_path) 
     
@@ -42,7 +42,7 @@ async def analisar_contrato(
         msg["Subject"] = "Resultado da Análise Contratual"
         msg["From"] = "sistema@drogaquinze.com.br"
         msg["To"] = email
-        msg.set_content(resposta_ia)
+        msg.set_content(resposta_ia, subtype='html')
 
         with open(temp_path, 'rb') as f:
             msg.add_attachment(f.read(), maintype='application', subtype='octet-stream', filename=arquivo.filename)
@@ -62,9 +62,15 @@ async def analisar_contrato(
     return {"mensagem": "Análise enviada por e-mail com sucesso! Não esqueça de olhar na sua caixa de entrada e na caixa de spam."}
 
 """
+
+GET DO PROJETO DANDO REPLACE - BAIXAR PROJETO
+
+git reset --hard
+git clean -fd
+git pull origin main
+
 Comandos para publicar alterações no GitHub:
 
---git add main.py
 git add .
 git commit -m "Atualiza mensagem de retorno com aviso sobre spam"
 git push origin main  # ou a branch que estiver usando
