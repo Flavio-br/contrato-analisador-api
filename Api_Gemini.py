@@ -6,10 +6,13 @@ import fitz  # PyMuPDF para leitura de PDF
 # Certifique-se de que sua chave de API está definida como uma variável de ambiente.
 # Ex: export GEMINI_API_KEY='SUA_CHAVE_AQUI' (Linux/macOS)
 # ou set GEMINI_API_KEY=SUA_CHAVE_AQUI (Windows)
-API_KEY = os.getenv("GEMINI_API_KEY")
 
-if not API_KEY:
-    raise ValueError("A variável de ambiente GEMINI_API_KEY não está definida. Por favor, defina-a antes de usar o módulo.")
+API_KEY="AIzaSyAdH4GOYPeJvSIO83kZFj_6HRfh2FA2FU8"
+
+# API_KEY = os.getenv("GEMINI_API_KEY")
+
+# if not API_KEY:
+#     raise ValueError("A variável de ambiente GEMINI_API_KEY não está definida. Por favor, defina-a antes de usar o módulo.")
 
 genai.configure(api_key=API_KEY)
 

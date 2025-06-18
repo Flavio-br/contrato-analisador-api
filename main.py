@@ -25,14 +25,16 @@ async def analisar_contrato(
         await out_file.write(content)
 
     # Simular resposta de IA
-    resposta_ia = f"Olá {nome}, segue análise para parte: {parte}. " #\n\n(IA responderia aqui...)"
-    Prompt = "1. Analise este contrato do ponto de vista do {parte} indicando os pontos positivos e negativos do contrato "
-    Prompt += "2. Verifique se a posse do imovel está segura para a parte {parte}"
-    Prompt += "3. Verifique se inadimplencia e atrazos nos pagamentos estão sendo tratados com multa"
-    Prompt += "4. sugira as alterações necessárias para garantir que a parte envolvida não tenha prejusizo "
-    Prompt += "5. altere as clausulas que entende necessarias indicando a sua substituição"
-    Prompt += "6. inclua as clausulas que entede necessárias para garantir que a parte envolvida não tenha prejusizo "
-    Prompt += "5. sua resposta deve vir adequada para envio em html"
+    resposta_ia = f"Olá {nome}, segue análise solicitada." #\n\n(IA responderia aqui...)"
+    Prompt = f"1. Analise este contrato do ponto de vista do {parte} indicando os pontos positivos e negativos do contrato. "
+    Prompt += f"2. Verifique se a posse do imovel está segura para a parte {parte}. "
+    Prompt += f"3. Verifique se inadimplencia e atrazos nos pagamentos estão sendo tratados com multa. "
+    Prompt += f"4. sugira as alterações necessárias para garantir que a parte envolvida não tenha prejusizo. "
+    Prompt += f"5. altere as clausulas que entende necessarias indicando a sua substituição. "
+    Prompt += f"6. inclua as clausulas que entede necessárias para garantir que a parte envolvida não tenha prejuizo. "
+    Prompt += f"7. sua resposta deve vir adequada para envio em html "
+    Prompt += f"8. Inicialize o texto do email suprimindo termos do tipo: Prezados ..."
+    Prompt += f"9. Finalize o texto do email com: Atenciosamente,\n\n Dra. Cláusula"
     #resposta_ia += processar_pdf_com_gemini(f"Analise Esse Contrato\n\n {parte}: {nome}", temp_path) # \n\n Vendedora: MRV ENGENHARIA
     resposta_ia += processar_pdf_com_gemini(f"{Prompt}", temp_path) 
     
