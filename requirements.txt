@@ -2,3 +2,5 @@ fastapi
 uvicorn
 aiofiles
 python-multipart
+pymupdf
+google-generativeai

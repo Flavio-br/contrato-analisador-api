@@ -4,6 +4,7 @@ import aiofiles
 import os
 import smtplib
 from email.message import EmailMessage
+from Api_Gemini import processar_pdf_com_gemini
 
 app = FastAPI()
 
@@ -25,6 +26,7 @@ async def analisar_contrato(
 
     # Simular resposta de IA
     resposta_ia = f"Olá {nome}, segue análise simulada para parte: {parte}.\n\n(IA responderia aqui...)"
+    resposta_ia += processar_pdf_com_gemini(f"Analise Esse Contrato\n\n Comprador: {nome} \n\n Vendedora: MRV ENGENHARIA", arquivo.filename)
 
     # Enviar e-mail
     try:
@@ -54,7 +56,8 @@ async def analisar_contrato(
 """
 Comandos para publicar alterações no GitHub:
 
-git add main.py
+--git add main.py
+git add .
 git commit -m "Atualiza mensagem de retorno com aviso sobre spam"
 git push origin main  # ou a branch que estiver usando
 """
