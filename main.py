@@ -32,9 +32,9 @@ async def analisar_contrato(
     Prompt += f"4. sugira as alterações necessárias para garantir que a parte envolvida não tenha prejusizo. "
     Prompt += f"5. altere as clausulas que entende necessarias indicando a sua substituição. "
     Prompt += f"6. inclua as clausulas que entede necessárias para garantir que a parte envolvida não tenha prejuizo. "
-   # Prompt += f"7. sua resposta deve vir adequada para envio em html "
-    Prompt += f"7. Inicialize o texto do email suprimindo termos do tipo: Prezados ..."
-    Prompt += f"8. Finalize o texto do email com: Atenciosamente,\n Dra. Cláusula"
+    Prompt += f"7. sua resposta deve vir adequada para envio em html "
+    Prompt += f"8. Inicialize o texto do email suprimindo termos do tipo: Prezados ..."
+    Prompt += f"9. Finalize o texto do email com: Atenciosamente,\n Dra. Cláusula"
     #resposta_ia += processar_pdf_com_gemini(f"Analise Esse Contrato\n\n {parte}: {nome}", temp_path) # \n\n Vendedora: MRV ENGENHARIA
     resposta_ia += processar_pdf_com_gemini(f"{Prompt}", temp_path) 
     
