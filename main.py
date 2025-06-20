@@ -61,16 +61,42 @@ async def analisar_contrato(
 
     # Simular resposta de IA
     resposta_ia = f"Olá {nome}, segue análise solicitada." #\n\n(IA responderia aqui...)"
-    Prompt = f"1. Analise este contrato do ponto de vista do {parte} indicando os pontos positivos e negativos do contrato. "
-    Prompt += f"2. Verifique se a posse do imovel está segura para a parte {parte}. "
-    Prompt += f"3. Verifique se inadimplencia e atrazos nos pagamentos estão sendo tratados com multa. "
-    Prompt += f"4. sugira as alterações necessárias para garantir que a parte envolvida não tenha prejusizo. "
-    Prompt += f"5. altere as clausulas que entende necessarias indicando a sua substituição. "
-    Prompt += f"6. inclua as clausulas que entede necessárias para garantir que a parte envolvida não tenha prejuizo. "
-    Prompt += f"7. sua resposta deve vir adequada para envio em html "
-    Prompt += f"8. Inicialize o texto do email suprimindo termos do tipo: Prezados ..."
-    Prompt += f"9. Finalize o texto do email com: Atenciosamente,\n Dra. Cláusula"
+    #Prompt = f"1. Analise este contrato do ponto de vista do {parte} indicando os pontos positivos e negativos do contrato. "
+    #Prompt += f"2. Verifique se a posse do imovel está segura para a parte {parte}. "
+    #Prompt += f"3. Verifique se inadimplencia e atrazos nos pagamentos estão sendo tratados com multa. "
+    #Prompt += f"4. sugira as alterações necessárias para garantir que a parte envolvida não tenha prejusizo. "
+    #Prompt += f"5. altere as clausulas que entende necessarias indicando a sua substituição. "
+    #Prompt += f"6. inclua as clausulas que entede necessárias para garantir que a parte envolvida não tenha prejuizo. "
+    #Prompt += f"7. sua resposta deve vir adequada para envio em html "
+    #Prompt += f"8. Inicialize o texto do email suprimindo termos do tipo: Prezados ..."
+    #Prompt += f"9. Finalize o texto do email com: Atenciosamente,\n Dra. Cláusula"
     #resposta_ia += processar_pdf_com_gemini(f"Analise Esse Contrato\n\n {parte}: {nome}", temp_path) # \n\n Vendedora: MRV ENGENHARIA
+    Prompt = f"""
+## Instrução para Análise de Contrato
+
+Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tarefa é analisar o contrato fornecido, focando nos interesses e segurança jurídica da parte especificada.
+
+### Contexto da Análise:
+- O contrato deve ser analisado sob a perspectiva da parte: **{parte}**.
+- **Adapte a análise ao tipo de contrato fornecido, seja ele de compra e venda, prestação de serviços, locação, ou qualquer outro. Se um item de análise não for aplicável ao tipo de contrato, a IA deve simplesmente omiti-lo ou adaptar a sua forma de responder**.
+
+### Tarefas de Análise:
+1.  **Pontos Críticos:** Indique os pontos positivos e negativos do contrato para a parte **{parte}**. Considere os direitos, deveres, riscos e vantagens.
+2.  **Cláusulas de Garantia/Segurança:** Verifique se as cláusulas relacionadas à garantia, segurança e cumprimento das obrigações principais da outra parte estão claras e adequadas para proteger a parte **{parte}**. (Ex: Para imóveis, posse. Para serviços, entrega e qualidade. Para locação, uso e conservação).
+3.  **Tratamento de Descumprimento/Inadimplência:** Analise como o contrato trata o descumprimento de obrigações (inadimplência, atrasos, falhas, etc.) e as consequências para ambas as partes, especialmente para a parte **{parte}**. Verifique a existência e aplicabilidade de multas, juros, penalidades ou outras formas de compensação.
+4.  **Sugestões de Alteração para Prevenção de Prejuízos:** Sugira alterações e/ou inclusões necessárias em cláusulas existentes para garantir que a parte **{parte}** não sofra prejuízos, justificando cada sugestão e correlacionando-as com os riscos identificados.
+5.  **Propostas de Cláusulas Substitutas:** Para as cláusulas que você entende que necessitam de alteração (identificadas no item 4), proponha a redação completa de uma ou mais cláusulas substitutas.
+6.  **Novas Cláusulas Essenciais:** Proponha a inclusão de novas cláusulas que sejam essenciais para proteger os interesses da parte **{parte}** e mitigar riscos não abordados explicitamente no contrato original.
+
+### Formato de Saída do E-mail:
+- A resposta deve ser formatada como um corpo de e-mail em **HTML**.
+- **O texto do e-mail NÃO deve iniciar com saudações formais como "Prezados", "Olá" ou "Estimados". Comece diretamente com a análise.**
+- O conteúdo deve ser claro, objetivo e fácil de entender.
+- Utilize títulos e subtítulos (`<h2>`, `<h3>`), listas (`<ul>`, `<ol>`) e parágrafos (`<p>`) para organizar a informação.
+- Use negrito (`<strong>`) para destacar termos importantes ou conclusões.
+- **Se um item de análise não for aplicável ao tipo de contrato, não o mencione explicitamente; foque apenas nos pontos relevantes.**
+- **Finalize o e-mail exatamente com a assinatura:** `Atenciosamente,<br>Dra. Cláusula`
+"""
     resposta_ia += processar_pdf_com_gemini(f"{Prompt}", temp_path)
 
     # Enviar e-mail
