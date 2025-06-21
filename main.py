@@ -30,7 +30,7 @@ origins = [
             # Remova esta linha em ambiente de produção para segurança.
     # Adicione aqui o domínio do seu frontend em produção, por exemplo:
     # "https://www.dra-clausula-frontend.com.br",
-    "https://dra-clausula-web.onrender.com"
+    "https://dra-clausula-frontend.onrender.com"
 ]
 
 app.add_middleware(
