@@ -112,7 +112,7 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
 
         with smtplib.SMTP("smtp.office365.com", 587) as smtp:
             smtp.starttls()
-            smtp.login("dra.clausula@hotmail.com", "draclausula829!")
+            smtp.login("dra.clausula@hotmail.com", "draclausula829!","mlqtraryuhhubijf")
             smtp.send_message(msg)
 
     except Exception as e:
