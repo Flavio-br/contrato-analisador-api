@@ -103,16 +103,16 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
     try:
         msg = EmailMessage()
         msg["Subject"] = "Resultado da Análise Contratual"
-        msg["From"] = "sistema@drogaquinze.com.br"
+        msg["From"] = "dra.clausula@hotmail.com"
         msg["To"] = email
         msg.set_content(resposta_ia, subtype='html')
 
         with open(temp_path, 'rb') as f:
             msg.add_attachment(f.read(), maintype='application', subtype='octet-stream', filename=arquivo.filename)
 
-        with smtplib.SMTP("smtp-legacy.office365.com", 587) as smtp:
+        with smtplib.SMTP("smtp.office365.com", 587) as smtp:
             smtp.starttls()
-            smtp.login("sistema@drogaquinze.com.br", "$ec@252")
+            smtp.login("dra.clausula@hotmail.com", "draclausula829!")
             smtp.send_message(msg)
 
     except Exception as e:
@@ -138,6 +138,6 @@ git pull origin main
 Comandos para publicar alterações no GitHub:
 
 git add .
-git commit -m "Atualiza mensagem de retorno com aviso sobre spam"
+git commit -m "Atualiza envio da conta de email"
 git push origin main  # ou a branch que estiver usando
 """
