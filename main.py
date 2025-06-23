@@ -75,7 +75,7 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
     # Enviar e-mail
     try:
         EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS") or "dra.clausula@hotmail.com"
-        EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD") or "kphtrhucqjwdmmgv"
+        EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD") or "oanoiyoftwgwdevc"
 
         msg = EmailMessage()
         msg["Subject"] = "Resultado da Análise Contratual"
