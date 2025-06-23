@@ -77,8 +77,8 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
         ##EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS") or "dra.clausula@hotmail.com"
         ##EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD") or "oanoiyoftwgwdevc"
 
-        EMAIL_ADDRESS = "dra.clausula@hotmail.com"
-        EMAIL_PASSWORD = "lapfihlrhnhpmfoh"
+        EMAIL_ADDRESS = "draclausula@gmail.com"
+        EMAIL_PASSWORD = "adunjzuwoqahruuj"
 
         msg = EmailMessage()
         msg["Subject"] = "Resultado da Análise Contratual"
@@ -89,7 +89,7 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
         with open(temp_path, 'rb') as f:
             msg.add_attachment(f.read(), maintype='application', subtype='octet-stream', filename=arquivo.filename)
 
-        with smtplib.SMTP("smtp.office365.com", 587) as smtp:
+        with smtplib.SMTP("smtp.gmail.com", 587) as smtp:
             smtp.starttls()
             smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
             smtp.send_message(msg)
