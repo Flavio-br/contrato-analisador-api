@@ -25,10 +25,10 @@ app = FastAPI()
 origins = [
     "http://localhost",
     "http://localhost:8000",
-    "[http://127.0.0.1:8080](http://127.0.0.1:8080)",
-    "[https://dra-clausula.onrender.com](https://dra-clausula.onrender.com)" # URL do seu frontend no Render
+    "http://127.0.0.1:8080",
+    "https://dra-clausula.onrender.com" # URL do seu frontend no Render
     # ADICIONE AQUI QUAISQUER OUTROS DOMÍNIOS ONDE SEU FRONTEND ESTARÁ HOSPEDADO
-    # Exemplo: "[https://seu-dominio-customizado.com](https://seu-dominio-customizado.com)"
+    # Exemplo: "https://seu-dominio-customizado.com"
 ]
 
 app.add_middleware(
@@ -114,9 +114,9 @@ async def criar_checkout_mercadopago(
         # URLs para onde o Mercado Pago redirecionará o usuário após o pagamento
         # VOCÊ DEVE SUBSTITUIR ESTAS URLs PELAS URLs REAIS DO SEU FRONTEND NO RENDER!
         "back_urls": {
-            "success": "[https://dra-clausula.onrender.com/pagamento-sucesso.html](https://dra-clausula.onrender.com/pagamento-sucesso.html)", # Página de sucesso no seu frontend
-            "failure": "[https://dra-clausula.onrender.com/pagamento-falha.html](https://dra-clausula.onrender.com/pagamento-falha.html)",   # Página de falha no seu frontend
-            "pending": "[https://dra-clausula.onrender.com/pagamento-pendente.html](https://dra-clausula.onrender.com/pagamento-pendente.html)" # Página de pagamento pendente no seu frontend
+            "success": "https://dra-clausula.onrender.com/pagamento-sucesso.html", # Página de sucesso no seu frontend
+            "failure": "https://dra-clausula.onrender.com/pagamento-falha.html",   # Página de falha no seu frontend
+            "pending": "https://dra-clausula.onrender.com/pagamento-pendente.html" # Página de pagamento pendente no seu frontend
         },
         "auto_return": "approved", # Redireciona automaticamente se o pagamento for aprovado
         "payer": {
@@ -331,15 +331,6 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
             logging.info("Chamando a função de processamento de IA...")
             resposta_ia = processar_pdf_com_gemini(Prompt, temp_path)
             logging.info("Resposta da IA recebida com sucesso.")
-
-            # --- INÍCIO DA CORREÇÃO: Limpar a resposta da IA para o e-mail ---
-            if isinstance(resposta_ia, str):
-                # Remove '```html' do início, opcionalmente com quebras de linha
-                resposta_ia = resposta_ia.replace("```html", "").strip()
-                # Remove '```' do final, opcionalmente com quebras de linha
-                resposta_ia = resposta_ia.replace("```", "").strip()
-            # --- FIM DA CORREÇÃO ---
-
         except ImportError:
             logging.exception("Erro de importação: Api_Gemini ou processar_pdf_com_gemini não encontrados. Verifique o arquivo e o caminho.")
             return JSONResponse(status_code=500, content={"erro": "Erro interno: Módulo de IA não encontrado ou com problema."})
@@ -357,7 +348,7 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
             msg["Subject"] = "Resultado da Análise Contratual - Dra. Cláusula"
             msg["From"] = EMAIL_ADDRESS
             msg["To"] = email
-            msg.set_content(resposta_ia, subtype='html') # resposta_ia já limpa aqui
+            msg.set_content(resposta_ia, subtype='html')
 
             with open(temp_path, 'rb') as f:
                 msg.add_attachment(f.read(), maintype='application', subtype='octet-stream', filename=arquivo.filename)
