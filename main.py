@@ -81,7 +81,7 @@ sdk = mercadopago.SDK(MERCADOPAGO_ACCESS_TOKEN)
 async def criar_checkout_mercadopago(
     item_title: str = Form("Análise de Contrato Dra. Cláusula"),
     item_price: float = Form(0.01), # PREÇO ALTERADO PARA 0.01 CENTAVOS
-    user_email: str = Form(...), # E-mail do usuário para associar ao pagamento (REMOVIDO VALOR PADRÃO FIXO)
+    user_email: str = Form(...), # E-mail do usuário para associar ao pagamento
     user_id: str = Form(...) # user_id do frontend para associar o pagamento no Firestore
 ):
     """
@@ -197,8 +197,8 @@ async def mercadopago_webhook(
                 "timestamp": firestore.SERVER_TIMESTAMP # Salva o timestamp do servidor
             }
             
-            # merge=True para atualizar se o documento já existir (útil para notificações de status de pagamento que mudam)
-            await payment_doc_ref.set(payment_data, merge=True) 
+            # CORREÇÃO: Removido 'await' aqui, pois firestore.Client.document.set() é síncrono.
+            payment_doc_ref.set(payment_data, merge=True) 
             logging.info(f"Status do pagamento {id} para {user_id_from_ref} salvo no Firestore como '{payment_status}'.")
 
             if payment_status == "approved":
