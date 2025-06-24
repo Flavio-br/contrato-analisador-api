@@ -274,20 +274,19 @@ async def analisar_contrato(
         raise HTTPException(status_code=500, detail="Serviço de banco de dados indisponível para verificar pagamento.")
     
     try:
-        # Consulta o Firestore para ver se o usuário tem um pagamento aprovado para este user_id
+        logging.info(f"API Analisar Contrato: Verificando pagamento para User ID: {user_id}")
         payments_ref = db.collection("payments").document(user_id).collection("transactions")
-        # Busca o pagamento aprovado mais recente para o user_id
         query_ref = payments_ref.where("status", "==", "approved").order_by("timestamp", direction=firestore.Query.DESCENDING).limit(1)
         docs = query_ref.get()
 
         if not docs:
-            logging.warning(f"Tentativa de análise para User ID {user_id} sem pagamento aprovado.")
+            logging.warning(f"API Analisar Contrato: Tentativa de análise para User ID {user_id} sem pagamento aprovado. Documentos encontrados: {len(docs)}")
             raise HTTPException(status_code=403, detail="Pagamento não confirmado para este serviço. Por favor, conclua o pagamento.")
         
-        logging.info(f"Pagamento aprovado confirmado para User ID: {user_id}. Prosseguindo com a análise.")
+        logging.info(f"API Analisar Contrato: Pagamento aprovado confirmado para User ID: {user_id}. Prosseguindo com a análise.")
 
     except Exception as e:
-        logging.exception(f"Erro ao verificar status de pagamento na análise para User ID {user_id}: {e}")
+        logging.exception(f"API Analisar Contrato: Erro ao verificar status de pagamento para User ID {user_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Erro interno ao verificar pagamento: {str(e)}")
 
     # O restante do código da análise de contrato continua aqui
