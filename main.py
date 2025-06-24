@@ -331,6 +331,15 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
             logging.info("Chamando a função de processamento de IA...")
             resposta_ia = processar_pdf_com_gemini(Prompt, temp_path)
             logging.info("Resposta da IA recebida com sucesso.")
+
+            # --- INÍCIO DA CORREÇÃO: Limpar a resposta da IA para o e-mail ---
+            if isinstance(resposta_ia, str):
+                # Remove '```html' do início, opcionalmente com quebras de linha
+                resposta_ia = resposta_ia.replace("```html", "").strip()
+                # Remove '```' do final, opcionalmente com quebras de linha
+                resposta_ia = resposta_ia.replace("```", "").strip()
+            # --- FIM DA CORREÇÃO ---
+
         except ImportError:
             logging.exception("Erro de importação: Api_Gemini ou processar_pdf_com_gemini não encontrados. Verifique o arquivo e o caminho.")
             return JSONResponse(status_code=500, content={"erro": "Erro interno: Módulo de IA não encontrado ou com problema."})
