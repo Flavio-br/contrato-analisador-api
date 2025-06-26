@@ -12,6 +12,8 @@ import firebase_admin # Importa a SDK do Firebase Admin
 from firebase_admin import credentials, firestore
 import json # Para carregar a chave JSON do Firebase
 
+#Versão 1.02
+
 # Configura o logging para ver mensagens no console do Render para depuração
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
@@ -315,12 +317,15 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
 - **Adapte a análise ao tipo de contrato fornecido.**
 
 ### Tarefas de Análise:
-1.  **Pontos Críticos:** Indique os pontos positivos e negativos do contrato para a parte **{parte}**.
-2.  **Cláusulas de Garantia/Segurança:** Verifique garantias, posse, entrega ou uso.
-3.  **Descumprimento/Inadimplência:** Analise como o contrato trata inadimplência, multas e penalidades.
-4.  **Sugestões de Alteração:** Sugira melhorias para proteger a parte **{parte}**.
-5.  **Propostas de Cláusulas Substitutas:** Redija cláusulas melhores, se necessário.
-6.  **Novas Cláusulas Essenciais:** Inclua cláusulas adicionais se for relevante.
+1.  **Identificação e Validação das Partes:** Verifique se todas as partes envolvidas estão corretamente identificadas, incluindo nomes completos/razões sociais, documentos de identificação/CNPJ e detalhes de contato. Indique qualquer inconsistência ou ausência.
+2.  **Objeto e Obrigações Contratuais:** Descreva de forma concisa o objeto principal do contrato e as obrigações claras de cada parte. Avalie a precisão e completude da descrição dos serviços ou produtos.
+3.  **Termos e Condições Essenciais:** Analise cuidadosamente os termos e condições gerais, incluindo prazos, formas de pagamento, direitos e responsabilidades de cada parte, e condições de encerramento do contrato.
+4.  **Pontos Críticos:** Indique os pontos positivos e negativos específicos do contrato para a parte **{parte}**, considerando os valores, prazos e condições financeiras acordados.
+5.  **Cláusulas de Garantia e Responsabilidade:** Verifique garantias oferecidas, condições de posse, entrega ou uso, e as responsabilidades explícitas de cada parte em caso de falhas ou danos.
+6.  **Descumprimento, Rescisão e Penalidades:** Analise como o contrato trata o descumprimento, inadimplência, as condições de rescisão, multas e penalidades associadas, bem como a resolução de disputas.
+7.  **Sugestões de Alteração:** Sugira melhorias específicas para proteger ainda mais os interesses da parte **{parte}**, fundamentando cada proposta.
+8.  **Propostas de Cláusulas Substitutas:** Redija versões melhoradas de cláusulas existentes, se a alteração sugerida exigir uma nova redação.
+9.  **Novas Cláusulas Essenciais:** Proponha a inclusão de quaisquer cláusulas adicionais que sejam relevantes e necessárias para a segurança jurídica da parte **{parte}**, justificando sua importância.
 
 ### Formato:
 - Responda em **HTML**, sem saudações iniciais.
