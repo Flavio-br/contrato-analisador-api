@@ -83,7 +83,7 @@ async def criar_checkout_mercadopago(
     item_price: float = Form(0.01), # PREÇO ALTERADO PARA 0.01 CENTAVOS default o preço ven do frontend
     user_email: str = Form(...), # E-mail do usuário para associar ao pagamento
     #user_id: str = Form(...) # user_id do frontend para associar o pagamento no Firestore
-    user_id: str = Form("TESTUSER2008863498") 
+    user_id: str = "TESTUSER2008863498" 
 ):
     """
     Endpoint para criar uma preferência de pagamento no Mercado Pago e retornar o link de checkout.
