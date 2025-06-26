@@ -80,7 +80,7 @@ sdk = mercadopago.SDK(MERCADOPAGO_ACCESS_TOKEN)
 @app.post("/api/pagamento/criar-checkout")
 async def criar_checkout_mercadopago(
     item_title: str = Form("Análise de Contrato Dra. Cláusula"),
-    item_price: float = Form(0.01), # O preço é recebido do frontend e pode variar (padrão 59.90 ou 0.01 com voucher). 
+    item_price: float = Form(0.01), # PREÇO ALTERADO PARA 0.01 CENTAVOS
     user_email: str = Form(...), # E-mail do usuário para associar ao pagamento
     user_id: str = Form(...) # user_id do frontend para associar o pagamento no Firestore
 ):
