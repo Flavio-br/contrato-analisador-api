@@ -11,11 +11,8 @@ import mercadopago # Importa a SDK do Mercado Pago
 import firebase_admin # Importa a SDK do Firebase Admin
 from firebase_admin import credentials, firestore
 import json # Para carregar a chave JSON do Firebase
-import base64
-import requests
 
-#Versão 1.03
-MAIN_INTERNAL_VERSION = "1.03"  # Tag interna de versão do main.py
+#Versão 1.02
 
 # Configura o logging para ver mensagens no console do Render para depuração
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -26,6 +23,17 @@ load_dotenv()
 
 app = FastAPI()
 
+
+import requests
+
+# === MAIN INTERNAL VERSION TAG ===
+MAIN_INTERNAL_VERSION = "1.04"
+# Voucher que libera análise sem pagamento (configure no Render como BYPASS_VOUCHER)
+BYPASS_VOUCHER = os.getenv("BYPASS_VOUCHER", "jfm2!").strip().lower()
+
+# Brevo (Sendinblue) API
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "").strip()
+EMAIL_FROM = os.getenv("EMAIL_FROM", "Dra. Cláusula <draclausula@gmail.com>")
 # --- INÍCIO DA CONFIGURAÇÃO CORS ---
 origins = [
     "http://localhost",
@@ -271,31 +279,43 @@ async def analisar_contrato(
     email: str = Form(...),
     parte: str = Form(...),
     arquivo: UploadFile = File(...),
-    user_id: str = Form(...) # Recebe o user_id do frontend para verificar pagamento
+    user_id: str = Form(...),  # Recebe o user_id do frontend para verificar pagamento,
+    voucher: str = Form("")  # Voucher opcional (ex.: jfm2!) para liberar análise sem pagamento
 ):
     # --- IMPORTANTE: VERIFICAÇÃO DE PAGAMENTO ANTES DA ANÁLISE ---
-    # Agora que temos o Firestore, podemos verificar o status de pagamento real.
-    if not db:
-        logging.error("Firestore não está inicializado. Não é possível verificar pagamento.")
-        raise HTTPException(status_code=500, detail="Serviço de banco de dados indisponível para verificar pagamento.")
-    
-    try:
-        logging.info(f"API Analisar Contrato: Verificando pagamento para User ID: {user_id}")
-        payments_ref = db.collection("payments").document(user_id).collection("transactions")
-        query_ref = payments_ref.where("status", "==", "approved").order_by("timestamp", direction=firestore.Query.DESCENDING).limit(1)
-        docs = query_ref.get()
+    # Bypass controlado por voucher (ex.: jfm2!) para liberar análise sem pagamento.
+    voucher_normalizado = (voucher or "").strip().lower()
+    bypass_pagamento = bool(BYPASS_VOUCHER) and (voucher_normalizado == BYPASS_VOUCHER)
 
-        if not docs:
-            logging.warning(f"API Analisar Contrato: Tentativa de análise para User ID {user_id} sem pagamento aprovado. Documentos encontrados: {len(docs)}")
-            raise HTTPException(status_code=403, detail="Pagamento não confirmado para este serviço. Por favor, conclua o pagamento.")
-        
-        logging.info(f"API Analisar Contrato: Pagamento aprovado confirmado para User ID: {user_id}. Prosseguindo com a análise.")
+    if bypass_pagamento:
+        logging.info("API Analisar Contrato: Bypass de pagamento ativado via voucher. Prosseguindo sem checar Firestore.")
+    else:
+        # Agora que temos o Firestore, podemos verificar o status de pagamento real.
+        if not db:
+            logging.error("Firestore não está inicializado. Não é possível verificar pagamento.")
+            raise HTTPException(status_code=500, detail="Serviço de banco de dados indisponível para verificar pagamento.")
 
-    except Exception as e:
-        logging.exception(f"API Analisar Contrato: Erro ao verificar status de pagamento para User ID {user_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro interno ao verificar pagamento: {str(e)}")
+        try:
+            logging.info(f"API Analisar Contrato: Verificando pagamento para User ID: {user_id}")
+            payments_ref = db.collection("payments").document(user_id).collection("transactions")
+            query_ref = payments_ref.where("status", "==", "approved").order_by(
+                "timestamp", direction=firestore.Query.DESCENDING
+            ).limit(1)
+            docs = query_ref.get()
 
-    # O restante do código da análise de contrato continua aqui
+            if not docs:
+                logging.warning(f"API Analisar Contrato: Tentativa de análise para User ID {user_id} sem pagamento aprovado.")
+                raise HTTPException(status_code=403, detail="Pagamento não confirmado para este serviço. Por favor, conclua o pagamento.")
+
+            logging.info(f"API Analisar Contrato: Pagamento aprovado confirmado para User ID: {user_id}. Prosseguindo com a análise.")
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            logging.exception(f"API Analisar Contrato: Erro ao verificar status de pagamento para User ID {user_id}: {e}")
+            raise HTTPException(status_code=500, detail=f"Erro interno ao verificar pagamento: {str(e)}")
+
+# O restante do código da análise de contrato continua aqui
     if not arquivo:
         logging.error("Erro: Arquivo não enviado na requisição.")
         return JSONResponse(status_code=400, content={"erro": "Arquivo não enviado."})
@@ -356,73 +376,48 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
             logging.exception(f"Erro inesperado ao processar PDF com Gemini: {e}")
             return JSONResponse(status_code=500, content={"erro": f"Erro na análise de IA: {str(e)}. Verifique o log para mais detalhes."})
 
-        # --- ENVIO DE E-MAIL (BREVO - API HTTP) ---
-        # Importante: No Render, configure as variáveis de ambiente:
-        #   BREVO_API_KEY   (obrigatória para envio)
-        #   EMAIL_FROM      (ex: 'Dra. Cláusula <contato@draclausula.com>')
-        # Observação: mesmo se o e-mail falhar, a análise deve retornar para o frontend.
-
+                # --- ENVIO DE E-MAIL (Brevo API) ---
+        # Importante: mesmo que o e-mail falhe, a análise deve ser retornada ao frontend.
         email_enviado = False
         email_erro = None
 
         try:
-            BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
-            EMAIL_FROM = os.environ.get("EMAIL_FROM", "Dra. Cláusula <draclausula@gmail.com>")
-
             if not BREVO_API_KEY:
-                raise Exception("BREVO_API_KEY não configurada nas variáveis de ambiente.")
+                raise ValueError("BREVO_API_KEY não configurada no ambiente do servidor.")
 
-            # Anexo: contrato enviado (PDF) - Brevo exige base64
-            with open(temp_path, "rb") as f:
-                attachment_b64 = base64.b64encode(f.read()).decode("utf-8")
-
+            subject = "Resultado da Análise Contratual - Dra. Cláusula"
             payload = {
-                "sender": {
-                    "name": "Dra. Cláusula",
-                    "email": EMAIL_FROM.split("<")[-1].replace(">", "").strip() if "<" in EMAIL_FROM else EMAIL_FROM
-                },
+                "sender": {"name": "Dra. Cláusula", "email": EMAIL_FROM.split("<")[-1].replace(">", "").strip() if "<" in EMAIL_FROM else EMAIL_FROM},
                 "to": [{"email": email}],
-                "subject": "Resultado da Análise Contratual - Dra. Cláusula",
-                "htmlContent": resposta_ia,
-                "attachment": [{
-                    "name": arquivo.filename,
-                    "content": attachment_b64
-                }]
+                "subject": subject,
+                "htmlContent": resposta_ia
             }
-
             headers = {
                 "accept": "application/json",
                 "api-key": BREVO_API_KEY,
                 "content-type": "application/json"
             }
 
-            resp_email = requests.post(
-                "https://api.brevo.com/v3/smtp/email",
-                json=payload,
-                headers=headers,
-                timeout=30
-            )
-
-            if resp_email.status_code >= 400:
-                raise Exception(f"Brevo retornou {resp_email.status_code}: {resp_email.text}")
+            r = requests.post("https://api.brevo.com/v3/smtp/email", json=payload, headers=headers, timeout=30)
+            if r.status_code >= 400:
+                raise Exception(f"Brevo retornou {r.status_code}: {r.text}")
 
             email_enviado = True
-            logging.info(f"E-mail (Brevo) enviado com sucesso para {email}")
+            logging.info(f"E-mail enviado com sucesso via Brevo para: {email}")
 
         except Exception as e:
             email_erro = str(e)
-            logging.exception(f"Falha ao enviar e-mail (Brevo): {email_erro}")
-            # NÃO interrompe o fluxo: a análise deve retornar mesmo com falha no e-mail.
+            logging.exception(f"Falha ao enviar e-mail via Brevo: {email_erro}")
 
-        # Retorna a análise para o frontend, independente do envio de e-mail
+        # Retorna a análise mesmo se o e-mail falhar
         return JSONResponse(status_code=200, content={
             "ok": True,
-            "mensagem": "Análise concluída. Confira o resultado abaixo.",
+            "mensagem": "Análise concluída. O resultado está disponível.",
             "html": resposta_ia,
             "email_enviado": email_enviado,
-            "email_erro": email_erro
+            "email_erro": email_erro,
+            "bypass_pagamento": bypass_pagamento
         })
-
 
     finally:
         # Garante que o arquivo temporário seja removido, mesmo que ocorra um erro
@@ -432,4 +427,3 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
                 logging.info(f"Arquivo temporário '{temp_path}' removido.")
             except Exception as e:
                 logging.error(f"Erro ao remover arquivo temporário {temp_path}: {e}")
-
