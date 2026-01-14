@@ -11,8 +11,11 @@ import mercadopago # Importa a SDK do Mercado Pago
 import firebase_admin # Importa a SDK do Firebase Admin
 from firebase_admin import credentials, firestore
 import json # Para carregar a chave JSON do Firebase
+import base64
+import requests
 
-#Versão 1.02
+#Versão 1.03
+MAIN_INTERNAL_VERSION = "1.03"  # Tag interna de versão do main.py
 
 # Configura o logging para ver mensagens no console do Render para depuração
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -353,41 +356,73 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
             logging.exception(f"Erro inesperado ao processar PDF com Gemini: {e}")
             return JSONResponse(status_code=500, content={"erro": f"Erro na análise de IA: {str(e)}. Verifique o log para mais detalhes."})
 
-        # --- CONFIGURAÇÃO DE E-MAIL (MANTIDA ORIGINALMENTE) ---
+        # --- ENVIO DE E-MAIL (BREVO - API HTTP) ---
+        # Importante: No Render, configure as variáveis de ambiente:
+        #   BREVO_API_KEY   (obrigatória para envio)
+        #   EMAIL_FROM      (ex: 'Dra. Cláusula <contato@draclausula.com>')
+        # Observação: mesmo se o e-mail falhar, a análise deve retornar para o frontend.
+
+        email_enviado = False
+        email_erro = None
+
         try:
-            # Credenciais de e-mail hardcoded como solicitado
-            EMAIL_ADDRESS = "draclausula@gmail.com"
-            EMAIL_PASSWORD = "adunjzuwoqahruuj"
+            BREVO_API_KEY = os.environ.get("BREVO_API_KEY")
+            EMAIL_FROM = os.environ.get("EMAIL_FROM", "Dra. Cláusula <draclausula@gmail.com>")
 
-            msg = EmailMessage()
-            msg["Subject"] = "Resultado da Análise Contratual - Dra. Cláusula"
-            msg["From"] = EMAIL_ADDRESS
-            msg["To"] = email
-            msg.set_content(resposta_ia, subtype='html')
+            if not BREVO_API_KEY:
+                raise Exception("BREVO_API_KEY não configurada nas variáveis de ambiente.")
 
-            with open(temp_path, 'rb') as f:
-                msg.add_attachment(f.read(), maintype='application', subtype='octet-stream', filename=arquivo.filename)
+            # Anexo: contrato enviado (PDF) - Brevo exige base64
+            with open(temp_path, "rb") as f:
+                attachment_b64 = base64.b64encode(f.read()).decode("utf-8")
 
-            with smtplib.SMTP("smtp.gmail.com", 587) as smtp:
-                smtp.starttls()
-                smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
-                smtp.send_message(msg)
-            logging.info(f"E-mail de análise enviado com sucesso para {email}")
+            payload = {
+                "sender": {
+                    "name": "Dra. Cláusula",
+                    "email": EMAIL_FROM.split("<")[-1].replace(">", "").strip() if "<" in EMAIL_FROM else EMAIL_FROM
+                },
+                "to": [{"email": email}],
+                "subject": "Resultado da Análise Contratual - Dra. Cláusula",
+                "htmlContent": resposta_ia,
+                "attachment": [{
+                    "name": arquivo.filename,
+                    "content": attachment_b64
+                }]
+            }
 
-        except smtplib.SMTPAuthenticationError:
-            logging.exception("Erro de autenticação SMTP: Verifique as credenciais e se há necessidade de senha de aplicativo.")
-            return JSONResponse(status_code=500, content={"erro": "Falha na autenticação do e-mail. Credenciais ou senha de aplicativo inválidas."})
-        except smtplib.SMTPConnectError:
-            logging.exception("Erro de conexão SMTP: Não foi possível conectar ao servidor de e-mail. Verifique a porta, o servidor e o firewall do ambiente de hospedagem.")
-            return JSONResponse(status_code=500, content={"erro": "Falha ao conectar ao servidor de e-mail. Tente novamente mais tarde."})
-        except smtplib.SMTPException as e:
-            logging.exception(f"Erro SMTP genérico: {e}")
-            return JSONResponse(status_code=500, content={"erro": f"Falha no envio do e-mail: Erro do servidor SMTP. ({str(e)})"})
+            headers = {
+                "accept": "application/json",
+                "api-key": BREVO_API_KEY,
+                "content-type": "application/json"
+            }
+
+            resp_email = requests.post(
+                "https://api.brevo.com/v3/smtp/email",
+                json=payload,
+                headers=headers,
+                timeout=30
+            )
+
+            if resp_email.status_code >= 400:
+                raise Exception(f"Brevo retornou {resp_email.status_code}: {resp_email.text}")
+
+            email_enviado = True
+            logging.info(f"E-mail (Brevo) enviado com sucesso para {email}")
+
         except Exception as e:
-            logging.exception(f"Erro inesperado ao enviar e-mail: {e}")
-            return JSONResponse(status_code=500, content={"erro": f"Falha ao enviar e-mail: {str(e)}. Verifique o log."})
+            email_erro = str(e)
+            logging.exception(f"Falha ao enviar e-mail (Brevo): {email_erro}")
+            # NÃO interrompe o fluxo: a análise deve retornar mesmo com falha no e-mail.
 
-        return {"mensagem": "Análise enviada por e-mail com sucesso! Verifique sua caixa de entrada e spam."}
+        # Retorna a análise para o frontend, independente do envio de e-mail
+        return JSONResponse(status_code=200, content={
+            "ok": True,
+            "mensagem": "Análise concluída. Confira o resultado abaixo.",
+            "html": resposta_ia,
+            "email_enviado": email_enviado,
+            "email_erro": email_erro
+        })
+
 
     finally:
         # Garante que o arquivo temporário seja removido, mesmo que ocorra um erro
