@@ -25,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # =========================
 # TAG INTERNA DE VERSÃO
 # =========================
-MAIN_INTERNAL_VERSION = "1.06"
+MAIN_INTERNAL_VERSION = "1.07"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -51,11 +51,27 @@ app.add_middleware(
 # =========================
 MERCADOPAGO_ACCESS_TOKEN = os.getenv("MERCADOPAGO_ACCESS_TOKEN")
 if not MERCADOPAGO_ACCESS_TOKEN:
-    logging.error("MERCADOPAGO_ACCESS_TOKEN não configurado.")
-    # Não dá pra funcionar pagamentos sem isso
-    raise RuntimeError("MERCADOPAGO_ACCESS_TOKEN é obrigatório.")
+    logging.warning("MERCADOPAGO_ACCESS_TOKEN não configurado. Endpoints de pagamento ficarão indisponíveis até configurar a variável de ambiente.")
 
-sdk = mercadopago.SDK(MERCADOPAGO_ACCESS_TOKEN)
+sdk = mercadopago.SDK(MERCADOPAGO_ACCESS_TOKEN) if MERCADOPAGO_ACCESS_TOKEN else None
+
+# helper: garante que pagamentos estão configurados
+from fastapi import HTTPException
+
+def _require_mp_sdk():
+    if sdk is None:
+        raise HTTPException(status_code=500, detail="Configuração ausente: MERCADOPAGO_ACCESS_TOKEN não está definido no servidor.")
+
+#
+# (continua)
+#
+# SDK instantiation already done above
+#
+#
+# marker
+#
+#
+MERCADOPAGO_ACCESS_TOKEN)
 
 # Brevo (e-mail por API HTTP)
 BREVO_API_KEY = os.getenv("BREVO_API_KEY")
@@ -156,6 +172,8 @@ async def criar_checkout(
     Cria uma preferência/checkout no Mercado Pago e salva transação como pending no Firestore.
     Retorna {checkout_url, payment_id}.
     """
+    _require_mp_sdk()
+
     try:
         price_float = float(item_price)
     except Exception:
@@ -217,6 +235,8 @@ async def webhook_mercadopago(request: Request):
     Webhook básico. Mercado Pago normalmente envia query params como:
       ?type=payment&data.id=123
     """
+    _require_mp_sdk()
+
     if not db:
         # sem firestore, ainda respondemos 200 para não ficar reentregando webhook
         return {"ok": True}
