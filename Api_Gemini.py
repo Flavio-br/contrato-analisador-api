@@ -2,29 +2,28 @@ import google.generativeai as genai
 import os
 import fitz  # PyMuPDF para leitura de PDF
 
+API_GEMINI_INTERNAL_VERSION = "1.01"
+
 # --- Configuração da API Gemini ---
 # Certifique-se de que sua chave de API está definida como uma variável de ambiente.
 # Ex: export GEMINI_API_KEY='SUA_CHAVE_AQUI' (Linux/macOS)
 # ou set GEMINI_API_KEY=SUA_CHAVE_AQUI (Windows)
 
-API_KEY="AIzaSyAdH4GOYPeJvSIO83kZFj_6HRfh2FA2FU8"
-
-# API_KEY = os.getenv("GEMINI_API_KEY")
-
-# if not API_KEY:
-#     raise ValueError("A variável de ambiente GEMINI_API_KEY não está definida. Por favor, defina-a antes de usar o módulo.")
+API_KEY = os.getenv("GEMINI_API_KEY")
+if not API_KEY:
+    raise ValueError("A variável de ambiente GEMINI_API_KEY não está definida. Configure-a no Render (Environment) para habilitar a análise.")
 
 genai.configure(api_key=API_KEY)
 
 # --- Nome do Modelo Gemini ---
-MODEL_NAME = "gemini-1.5-flash"
+MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
 try:
     # A inicialização do modelo pode ser feita uma vez ou dentro da função, dependendo do uso.
     # Para simplicidade e eficiência, vamos inicializá-lo aqui no escopo do módulo.
     _gemini_model = genai.GenerativeModel(MODEL_NAME)
 except Exception as e:
-    raise RuntimeError(f"Erro ao inicializar o modelo '{MODEL_NAME}': {e}. Verifique o nome do modelo e sua chave de API.")
+    raise RuntimeError(f"Erro ao inicializar o modelo '{MODEL_NAME}': {e}. Verifique o nome do modelo e sua chave de API. (Dica: use genai.list_models() para ver modelos disponíveis)")
 
 # --- Função para Ler Conteúdo de PDF Local ---
 def _read_pdf_content(pdf_file_path: str) -> str:
