@@ -25,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # =========================
 # TAG INTERNA DE VERSÃO
 # =========================
-MAIN_INTERNAL_VERSION = "1.07"
+MAIN_INTERNAL_VERSION = "1.09"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -71,7 +71,6 @@ def _require_mp_sdk():
 # marker
 #
 #
-MERCADOPAGO_ACCESS_TOKEN
 
 # Brevo (e-mail por API HTTP)
 BREVO_API_KEY = os.getenv("BREVO_API_KEY")
@@ -131,7 +130,7 @@ def _find_latest_approved(user_id: str) -> Optional[dict]:
 
 def _send_email_brevo(to_email: str, subject: str, html: str, attachment_name: Optional[str]=None, attachment_bytes: Optional[bytes]=None) -> None:
     if not BREVO_API_KEY:
-        raise RuntimeError("BREVO_API_KEY não configurada.")
+        return False, "BREVO_API_KEY não configurada."
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {
         "accept": "application/json",
@@ -325,7 +324,7 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
 - **Finalize com:** `Atenciosamente,<br>Dra. Cláusula`
 """
         logging.info("Chamando a função de processamento de IA...")
-        resposta_html = processar_pdf_com_gemini(temp_path, prompt)
+        resposta_html = processar_pdf_com_gemini(prompt, temp_path)
         if not resposta_html:
             raise HTTPException(status_code=500, detail="IA não retornou conteúdo.")
         logging.info("Resposta da IA recebida com sucesso.")
@@ -338,7 +337,7 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
         try:
             # opcional: anexar o PDF original
             attachment_bytes = content if content else None
-            _send_email_brevo(
+            email_ok, email_err = _send_email_brevo(
                 to_email=email,
                 subject=assunto,
                 html=resposta_html,
@@ -357,7 +356,7 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
             "mensagem": "Análise concluída. Confira o resultado abaixo.",
             "html": resposta_html,
             "email_enviado": email_enviado,
-            "email_erro": email_erro,
+            "email_erro": (email_err if not email_ok else None),
             "bypass_pagamento": bypass_pagamento,
             "version": MAIN_INTERNAL_VERSION,
         }
