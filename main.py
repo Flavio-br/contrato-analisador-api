@@ -71,7 +71,7 @@ def _require_mp_sdk():
 # marker
 #
 #
-MERCADOPAGO_ACCESS_TOKEN)
+MERCADOPAGO_ACCESS_TOKEN
 
 # Brevo (e-mail por API HTTP)
 BREVO_API_KEY = os.getenv("BREVO_API_KEY")
