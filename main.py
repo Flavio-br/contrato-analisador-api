@@ -6,6 +6,7 @@ import os
 import smtplib
 from email.message import EmailMessage
 from dotenv import load_dotenv
+import requests
 import logging
 import mercadopago # Importa a SDK do Mercado Pago
 import firebase_admin # Importa a SDK do Firebase Admin
@@ -23,17 +24,16 @@ load_dotenv()
 
 app = FastAPI()
 
-
-import requests
-
 # === MAIN INTERNAL VERSION TAG ===
-MAIN_INTERNAL_VERSION = "1.04"
+MAIN_INTERNAL_VERSION = "1.05"
 # Voucher que libera análise sem pagamento (configure no Render como BYPASS_VOUCHER)
 BYPASS_VOUCHER = os.getenv("BYPASS_VOUCHER", "jfm2!").strip().lower()
 
 # Brevo (Sendinblue) API
 BREVO_API_KEY = os.getenv("BREVO_API_KEY", "").strip()
-EMAIL_FROM = os.getenv("EMAIL_FROM", "Dra. Cláusula <draclausula@gmail.com>")
+EMAIL_FROM = os.getenv("EMAIL_FROM", "Dra. Cláusula <draclausula@gmail.com>").strip()
+
+
 # --- INÍCIO DA CONFIGURAÇÃO CORS ---
 origins = [
     "http://localhost",
@@ -279,18 +279,16 @@ async def analisar_contrato(
     email: str = Form(...),
     parte: str = Form(...),
     arquivo: UploadFile = File(...),
-    user_id: str = Form(...),  # Recebe o user_id do frontend para verificar pagamento,
+    user_id: str = Form(...), # Recebe o user_id do frontend para verificar pagamento
     voucher: str = Form("")  # Voucher opcional (ex.: jfm2!) para liberar análise sem pagamento
 ):
-    # --- IMPORTANTE: VERIFICAÇÃO DE PAGAMENTO ANTES DA ANÁLISE ---
-    # Bypass controlado por voucher (ex.: jfm2!) para liberar análise sem pagamento.
+    # --- BYPASS por voucher (libera análise sem pagamento) ---
     voucher_normalizado = (voucher or "").strip().lower()
     bypass_pagamento = bool(BYPASS_VOUCHER) and (voucher_normalizado == BYPASS_VOUCHER)
-
-    if bypass_pagamento:
-        logging.info("API Analisar Contrato: Bypass de pagamento ativado via voucher. Prosseguindo sem checar Firestore.")
-    else:
-        # Agora que temos o Firestore, podemos verificar o status de pagamento real.
+    logging.info(f"API Analisar Contrato: Voucher=\'{voucher_normalizado}\' | bypass_pagamento={bypass_pagamento} | user_id={user_id}")
+    # --- IMPORTANTE: VERIFICAÇÃO DE PAGAMENTO ANTES DA ANÁLISE ---
+    # Se NÃO houver bypass por voucher, exigimos pagamento aprovado no Firestore.
+    if not bypass_pagamento:
         if not db:
             logging.error("Firestore não está inicializado. Não é possível verificar pagamento.")
             raise HTTPException(status_code=500, detail="Serviço de banco de dados indisponível para verificar pagamento.")
@@ -298,24 +296,32 @@ async def analisar_contrato(
         try:
             logging.info(f"API Analisar Contrato: Verificando pagamento para User ID: {user_id}")
             payments_ref = db.collection("payments").document(user_id).collection("transactions")
-            query_ref = payments_ref.where("status", "==", "approved").order_by(
-                "timestamp", direction=firestore.Query.DESCENDING
-            ).limit(1)
+            query_ref = (
+                payments_ref
+                .where("status", "==", "approved")
+                .order_by("timestamp", direction=firestore.Query.DESCENDING)
+                .limit(1)
+            )
             docs = query_ref.get()
 
             if not docs:
-                logging.warning(f"API Analisar Contrato: Tentativa de análise para User ID {user_id} sem pagamento aprovado.")
+                logging.warning(
+                    f"API Analisar Contrato: Tentativa de análise para User ID {user_id} sem pagamento aprovado. "
+                    f"Documentos encontrados: {len(docs)}"
+                )
                 raise HTTPException(status_code=403, detail="Pagamento não confirmado para este serviço. Por favor, conclua o pagamento.")
 
             logging.info(f"API Analisar Contrato: Pagamento aprovado confirmado para User ID: {user_id}. Prosseguindo com a análise.")
 
         except HTTPException:
+            # Mantém o status correto (403, 400, etc.) sem transformar em 500
             raise
         except Exception as e:
             logging.exception(f"API Analisar Contrato: Erro ao verificar status de pagamento para User ID {user_id}: {e}")
-            raise HTTPException(status_code=500, detail=f"Erro interno ao verificar pagamento: {str(e)}")
+            raise HTTPException(status_code=500, detail="Erro interno ao verificar pagamento. Tente novamente em instantes.")
 
-# O restante do código da análise de contrato continua aqui
+
+    # O restante do código da análise de contrato continua aqui
     if not arquivo:
         logging.error("Erro: Arquivo não enviado na requisição.")
         return JSONResponse(status_code=400, content={"erro": "Arquivo não enviado."})
@@ -376,48 +382,41 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
             logging.exception(f"Erro inesperado ao processar PDF com Gemini: {e}")
             return JSONResponse(status_code=500, content={"erro": f"Erro na análise de IA: {str(e)}. Verifique o log para mais detalhes."})
 
-                # --- ENVIO DE E-MAIL (Brevo API) ---
-        # Importante: mesmo que o e-mail falhe, a análise deve ser retornada ao frontend.
-        email_enviado = False
-        email_erro = None
-
+        # --- CONFIGURAÇÃO DE E-MAIL (MANTIDA ORIGINALMENTE) ---
         try:
-            if not BREVO_API_KEY:
-                raise ValueError("BREVO_API_KEY não configurada no ambiente do servidor.")
+            # Credenciais de e-mail hardcoded como solicitado
+            EMAIL_ADDRESS = "draclausula@gmail.com"
+            EMAIL_PASSWORD = "adunjzuwoqahruuj"
 
-            subject = "Resultado da Análise Contratual - Dra. Cláusula"
-            payload = {
-                "sender": {"name": "Dra. Cláusula", "email": EMAIL_FROM.split("<")[-1].replace(">", "").strip() if "<" in EMAIL_FROM else EMAIL_FROM},
-                "to": [{"email": email}],
-                "subject": subject,
-                "htmlContent": resposta_ia
-            }
-            headers = {
-                "accept": "application/json",
-                "api-key": BREVO_API_KEY,
-                "content-type": "application/json"
-            }
+            msg = EmailMessage()
+            msg["Subject"] = "Resultado da Análise Contratual - Dra. Cláusula"
+            msg["From"] = EMAIL_ADDRESS
+            msg["To"] = email
+            msg.set_content(resposta_ia, subtype='html')
 
-            r = requests.post("https://api.brevo.com/v3/smtp/email", json=payload, headers=headers, timeout=30)
-            if r.status_code >= 400:
-                raise Exception(f"Brevo retornou {r.status_code}: {r.text}")
+            with open(temp_path, 'rb') as f:
+                msg.add_attachment(f.read(), maintype='application', subtype='octet-stream', filename=arquivo.filename)
 
-            email_enviado = True
-            logging.info(f"E-mail enviado com sucesso via Brevo para: {email}")
+            with smtplib.SMTP("smtp.gmail.com", 587) as smtp:
+                smtp.starttls()
+                smtp.login(EMAIL_ADDRESS, EMAIL_PASSWORD)
+                smtp.send_message(msg)
+            logging.info(f"E-mail de análise enviado com sucesso para {email}")
 
+        except smtplib.SMTPAuthenticationError:
+            logging.exception("Erro de autenticação SMTP: Verifique as credenciais e se há necessidade de senha de aplicativo.")
+            return JSONResponse(status_code=500, content={"erro": "Falha na autenticação do e-mail. Credenciais ou senha de aplicativo inválidas."})
+        except smtplib.SMTPConnectError:
+            logging.exception("Erro de conexão SMTP: Não foi possível conectar ao servidor de e-mail. Verifique a porta, o servidor e o firewall do ambiente de hospedagem.")
+            return JSONResponse(status_code=500, content={"erro": "Falha ao conectar ao servidor de e-mail. Tente novamente mais tarde."})
+        except smtplib.SMTPException as e:
+            logging.exception(f"Erro SMTP genérico: {e}")
+            return JSONResponse(status_code=500, content={"erro": f"Falha no envio do e-mail: Erro do servidor SMTP. ({str(e)})"})
         except Exception as e:
-            email_erro = str(e)
-            logging.exception(f"Falha ao enviar e-mail via Brevo: {email_erro}")
+            logging.exception(f"Erro inesperado ao enviar e-mail: {e}")
+            return JSONResponse(status_code=500, content={"erro": f"Falha ao enviar e-mail: {str(e)}. Verifique o log."})
 
-        # Retorna a análise mesmo se o e-mail falhar
-        return JSONResponse(status_code=200, content={
-            "ok": True,
-            "mensagem": "Análise concluída. O resultado está disponível.",
-            "html": resposta_ia,
-            "email_enviado": email_enviado,
-            "email_erro": email_erro,
-            "bypass_pagamento": bypass_pagamento
-        })
+        return {"mensagem": "Análise enviada por e-mail com sucesso! Verifique sua caixa de entrada e spam."}
 
     finally:
         # Garante que o arquivo temporário seja removido, mesmo que ocorra um erro
@@ -427,3 +426,4 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
                 logging.info(f"Arquivo temporário '{temp_path}' removido.")
             except Exception as e:
                 logging.error(f"Erro ao remover arquivo temporário {temp_path}: {e}")
+
