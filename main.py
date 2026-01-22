@@ -25,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # =========================
 # TAG INTERNA DE VERSÃO
 # =========================
-MAIN_INTERNAL_VERSION = "1.12"
+MAIN_INTERNAL_VERSION = "1.13"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -123,6 +123,16 @@ def _find_latest_approved(user_id: str) -> Optional[dict]:
     payments_ref = db.collection("payments").document(user_id).collection("transactions")
     # status == approved, order by timestamp desc, limit 1
     q = payments_ref.where("status", "==", "approved").order_by("timestamp", direction=firestore.Query.DESCENDING).limit(1)
+    docs = q.get()
+    if not docs:
+        return None
+    return docs[0].to_dict()
+
+def _find_latest_transaction(user_id: str) -> Optional[dict]:
+    if not db:
+        return None
+    ref = db.collection("payments").document(user_id).collection("transactions")
+    q = ref.order_by("timestamp", direction=firestore.Query.DESCENDING).limit(1)
     docs = q.get()
     if not docs:
         return None
@@ -226,23 +236,29 @@ async def criar_checkout(
         logging.exception(f"[MP] Erro criando checkout: {e}")
         raise HTTPException(status_code=500, detail=f"Erro ao criar checkout Mercado Pago: {str(e)}")
 
-
 @app.get("/api/pagamento/verificar-status")
 async def verificar_status(user_id: str):
-    """
-    Retorna status approved quando houver transação aprovada.
-    """
     if not db:
         raise HTTPException(status_code=500, detail="Firestore indisponível")
 
     try:
-        approved = _find_latest_approved(user_id)
-        if approved:
+        tx = _find_latest_transaction(user_id)
+        if not tx:
+            return JSONResponse(status_code=200, content={"status": "not_found", "message": "Nenhuma transação encontrada."})
+
+        status = (tx.get("status") or "").lower()
+
+        if status == "approved":
             return JSONResponse(status_code=200, content={"status": "approved", "message": "Pagamento confirmado com sucesso."})
-        return JSONResponse(status_code=200, content={"status": "pending_or_rejected", "message": "Pagamento não aprovado ou pendente."})
+
+        if status == "pending":
+            return JSONResponse(status_code=200, content={"status": "pending", "message": "PIX pendente. Aguardando confirmação do pagamento."})
+
+        return JSONResponse(status_code=200, content={"status": status or "unknown", "message": "Pagamento não aprovado."})
     except Exception as e:
         logging.exception(f"Erro ao verificar status de pagamento para User ID {user_id}: {e}")
-        raise HTTPException(status_code=500, detail=f"Erro interno ao verificar status de pagamento: {str(e)}")
+        raise HTTPException(status_code=500, detail="Erro interno ao verificar status de pagamento.")
+
 
 @app.post("/api/pagamento/webhook-mercadopago")
 async def webhook_mercadopago(request: Request):
