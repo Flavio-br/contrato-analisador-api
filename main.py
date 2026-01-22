@@ -25,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # =========================
 # TAG INTERNA DE VERSÃO
 # =========================
-MAIN_INTERNAL_VERSION = "1.13"
+MAIN_INTERNAL_VERSION = "1.14"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -138,9 +138,17 @@ def _find_latest_transaction(user_id: str) -> Optional[dict]:
         return None
     return docs[0].to_dict()
 
-def _send_email_brevo(to_email: str, subject: str, html: str, attachment_name: Optional[str]=None, attachment_bytes: Optional[bytes]=None) -> None:
+def _send_email_brevo(
+    to_email: str,
+    subject: str,
+    html: str,
+    attachment_name: Optional[str] = None,
+    attachment_bytes: Optional[bytes] = None,
+) -> tuple[bool, Optional[str]]:
+    """Envia e-mail via Brevo. Retorna (ok, erro)."""
     if not BREVO_API_KEY:
         return False, "BREVO_API_KEY não configurada."
+
     url = "https://api.brevo.com/v3/smtp/email"
     headers = {
         "accept": "application/json",
@@ -158,12 +166,16 @@ def _send_email_brevo(to_email: str, subject: str, html: str, attachment_name: O
             "name": attachment_name,
             "content": base64.b64encode(attachment_bytes).decode("utf-8"),
         }]
+
     r = requests.post(url, headers=headers, json=payload, timeout=30)
     if r.status_code >= 400:
-        raise RuntimeError(f"Brevo erro {r.status_code}: {r.text[:500]}")
+        return False, f"Brevo erro {r.status_code}: {r.text[:500]}"
+
+    return True, None
 
 # =========================
 # Rotas
+
 # =========================
 
 @app.get("/")
@@ -383,28 +395,33 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
         assunto = "Resultado da Análise Contratual - Dra. Cláusula"
 
         try:
-            # opcional: anexar o PDF original
-            attachment_bytes = content if content else None
-            email_ok, email_err = _send_email_brevo(
-                to_email=email,
-                subject=assunto,
-                html=resposta_html,
-                attachment_name=arquivo.filename,
-                attachment_bytes=attachment_bytes
-            )
-            email_enviado = True
-            logging.info(f"E-mail enviado via Brevo com sucesso para {email}")
-        except Exception as e:
-            # NÃO derruba o endpoint
-            email_erro = str(e)
-            logging.exception(f"Falha ao enviar e-mail (Brevo): {email_erro}")
+    # opcional: anexar o PDF original
+    attachment_bytes = content if content else None
+    email_ok, email_err = _send_email_brevo(
+        to_email=email,
+        subject=assunto,
+        html=resposta_html,
+        attachment_name=arquivo.filename,
+        attachment_bytes=attachment_bytes,
+    )
+    email_enviado = bool(email_ok)
+    email_erro = email_err
+    if email_ok:
+        logging.info(f"E-mail enviado via Brevo com sucesso para {email}")
+    else:
+        logging.warning(f"E-mail não enviado via Brevo: {email_err}")
+except Exception as e:
+    # NÃO derruba o endpoint
+    email_enviado = False
+    email_erro = str(e)
+    logging.exception(f"Falha ao enviar e-mail (Brevo): {email_erro}")
 
         return {
             "ok": True,
             "mensagem": "Análise concluída. Confira o resultado abaixo.",
             "html": resposta_html,
             "email_enviado": email_enviado,
-            "email_erro": (email_err if not email_ok else None),
+            "email_erro": email_erro,
             "bypass_pagamento": bypass_pagamento,
             "version": MAIN_INTERNAL_VERSION,
         }
