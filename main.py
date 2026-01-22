@@ -25,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # =========================
 # TAG INTERNA DE VERSÃO
 # =========================
-MAIN_INTERNAL_VERSION = "1.10"
+MAIN_INTERNAL_VERSION = "1.11"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -188,6 +188,7 @@ async def criar_checkout(
             "title": item_title,
             "quantity": 1,
             "unit_price": price_float,
+            "external_reference": user_id,
         }],
         "external_reference": user_id,  # 🔑 vínculo principal
         "metadata": {
@@ -247,42 +248,58 @@ async def verificar_status(user_id: str):
 
 @app.post("/api/pagamento/webhook-mercadopago")
 async def webhook_mercadopago(request: Request):
-    """
-    Webhook básico. Mercado Pago normalmente envia query params como:
-      ?type=payment&data.id=123
-    """
     _require_mp_sdk()
 
-    if not db:
-        # sem firestore, ainda respondemos 200 para não ficar reentregando webhook
-        return {"ok": True}
-
-    params = dict(request.query_params)
-    payment_type = params.get("type") or params.get("topic")
-    data_id = params.get("data.id") or params.get("id")
-    if payment_type != "payment" or not data_id:
-        return {"ok": True}
-
+    # Sempre responda 200 rápido; mas vamos registrar o que chegou
     try:
-        payment = sdk.payment().get(data_id)
+        params = dict(request.query_params)
+        body = {}
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        logging.info(f"[MP WEBHOOK] query={params} body_keys={list(body.keys())}")
+
+        # Mercado Pago pode mandar:
+        # - query: ?type=payment&data.id=123
+        # - body: {"type":"payment","data":{"id":"123"}}  (ou variações)
+        payment_type = params.get("type") or params.get("topic") or body.get("type") or body.get("topic")
+
+        data_id = (
+            params.get("data.id")
+            or params.get("id")
+            or (body.get("data") or {}).get("id")
+            or body.get("id")
+        )
+
+        if payment_type != "payment" or not data_id:
+            return {"ok": True}
+
+        payment = sdk.payment().get(str(data_id))
         if not payment or payment.get("status") != 200:
+            logging.warning(f"[MP WEBHOOK] payment.get falhou para id={data_id} status={payment.get('status') if payment else None}")
             return {"ok": True}
 
         p = payment.get("response", {})
         status = p.get("status")
-        metadata = p.get("metadata") or {}
-        user_id = p.get("external_reference") or metadata.get("user_id")
 
-        if user_id:
+        # ✅ fonte mais confiável para vincular ao seu pedido/usuário
+        user_id = p.get("external_reference") or (p.get("metadata") or {}).get("user_id")
+
+        logging.info(f"[MP WEBHOOK] payment_id={data_id} status={status} user_id={user_id}")
+
+        if db and user_id:
             _store_transaction(str(user_id), str(data_id), {
                 "status": status,
-                "payment_id": data_id,
+                "payment_id": str(data_id),
                 "timestamp": _now_utc(),
                 "raw": p,
             })
+
         return {"ok": True}
     except Exception as e:
-        logging.exception(f"Webhook Mercado Pago erro: {e}")
+        logging.exception(f"[MP WEBHOOK] erro: {e}")
         return {"ok": True}
 
 @app.post("/api/contrato/analisar")
