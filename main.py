@@ -25,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # =========================
 # TAG INTERNA DE VERSÃO
 # =========================
-MAIN_INTERNAL_VERSION = "1.11"
+MAIN_INTERNAL_VERSION = "1.12"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -167,10 +167,6 @@ async def criar_checkout(
     user_email: str = Form(...),
     user_id: str = Form(...),
 ):
-    """
-    Cria uma preferência/checkout no Mercado Pago e salva transação como pending no Firestore.
-    Retorna {checkout_url, payment_id}.
-    """
     _require_mp_sdk()
 
     try:
@@ -178,23 +174,17 @@ async def criar_checkout(
     except Exception:
         raise HTTPException(status_code=400, detail="item_price inválido")
 
-    BASE_URL = os.getenv(
-        "BASE_URL",
-        "https://contrato-analisador-api.onrender.com"
-    )
+    # ✅ Defina aqui (evita NameError)
+    BASE_URL = os.getenv("BASE_URL", "https://contrato-analisador-api.onrender.com")
 
     preference_data = {
         "items": [{
             "title": item_title,
             "quantity": 1,
             "unit_price": price_float,
-            "external_reference": user_id,
         }],
-        "external_reference": user_id,  # 🔑 vínculo principal
-        "metadata": {
-            "user_id": user_id,
-            "user_email": user_email,
-        },
+        "external_reference": user_id,
+        "metadata": {"user_id": user_id, "user_email": user_email},
         "notification_url": f"{BASE_URL}/api/pagamento/webhook-mercadopago",
         "back_urls": {
             "success": "https://dra-clausula.onrender.com/pagamento/sucesso",
@@ -204,30 +194,38 @@ async def criar_checkout(
         "auto_return": "approved",
     }
 
-    pref = sdk.preference().create(preference_data)
-    if not pref or pref.get("status") not in (200, 201):
-        raise HTTPException(status_code=500, detail="Falha ao criar preferência Mercado Pago")
+    try:
+        pref = sdk.preference().create(preference_data)
+        logging.info(f"[MP] preference.create status={pref.get('status')} response_keys={list((pref.get('response') or {}).keys())}")
 
-    body = pref.get("response", {})
-    checkout_url = body.get("init_point") or body.get("sandbox_init_point")
-    preference_id = body.get("id")
+        if not pref or pref.get("status") not in (200, 201):
+            raise HTTPException(status_code=500, detail=f"Falha ao criar preferência Mercado Pago: {pref}")
 
-    if not checkout_url or not preference_id:
-        raise HTTPException(status_code=500, detail="Resposta do Mercado Pago incompleta")
+        body = pref.get("response", {})
+        checkout_url = body.get("init_point") or body.get("sandbox_init_point")
+        preference_id = body.get("id")
 
-    payment_id = preference_id  # usamos preference_id como id interno
+        if not checkout_url or not preference_id:
+            raise HTTPException(status_code=500, detail=f"Resposta do Mercado Pago incompleta: {body}")
 
-    _store_transaction(user_id, payment_id, {
-        "status": "pending",
-        "preference_id": preference_id,
-        "checkout_url": checkout_url,
-        "user_email": user_email,
-        "timestamp": _now_utc(),
-    })
-    logging.info(
-        f"[MP WEBHOOK] Pagamento {data_id} atualizado para status={status} | user_id={user_id}"
-    )
-    return {"checkout_url": checkout_url, "payment_id": payment_id}
+        payment_id = preference_id  # seu id interno
+
+        _store_transaction(user_id, payment_id, {
+            "status": "pending",
+            "preference_id": preference_id,
+            "checkout_url": checkout_url,
+            "user_email": user_email,
+            "timestamp": _now_utc(),
+        })
+
+        return {"checkout_url": checkout_url, "payment_id": payment_id}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logging.exception(f"[MP] Erro criando checkout: {e}")
+        raise HTTPException(status_code=500, detail=f"Erro ao criar checkout Mercado Pago: {str(e)}")
+
 
 @app.get("/api/pagamento/verificar-status")
 async def verificar_status(user_id: str):
