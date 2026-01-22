@@ -25,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # =========================
 # TAG INTERNA DE VERSÃO
 # =========================
-MAIN_INTERNAL_VERSION = "1.09"
+MAIN_INTERNAL_VERSION = "1.10"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -178,14 +178,29 @@ async def criar_checkout(
     except Exception:
         raise HTTPException(status_code=400, detail="item_price inválido")
 
+    BASE_URL = os.getenv(
+        "BASE_URL",
+        "https://contrato-analisador-api.onrender.com"
+    )
+
     preference_data = {
         "items": [{
             "title": item_title,
             "quantity": 1,
             "unit_price": price_float,
         }],
-        # Você pode configurar back_urls no Mercado Pago se quiser
-        "metadata": {"user_id": user_id, "user_email": user_email},
+        "external_reference": user_id,  # 🔑 vínculo principal
+        "metadata": {
+            "user_id": user_id,
+            "user_email": user_email,
+        },
+        "notification_url": f"{BASE_URL}/api/pagamento/webhook-mercadopago",
+        "back_urls": {
+            "success": "https://dra-clausula.onrender.com/pagamento/sucesso",
+            "failure": "https://dra-clausula.onrender.com/pagamento/erro",
+            "pending": "https://dra-clausula.onrender.com/pagamento/pendente",
+        },
+        "auto_return": "approved",
     }
 
     pref = sdk.preference().create(preference_data)
@@ -208,7 +223,9 @@ async def criar_checkout(
         "user_email": user_email,
         "timestamp": _now_utc(),
     })
-
+    logging.info(
+        f"[MP WEBHOOK] Pagamento {data_id} atualizado para status={status} | user_id={user_id}"
+    )
     return {"checkout_url": checkout_url, "payment_id": payment_id}
 
 @app.get("/api/pagamento/verificar-status")
@@ -254,7 +271,7 @@ async def webhook_mercadopago(request: Request):
         p = payment.get("response", {})
         status = p.get("status")
         metadata = p.get("metadata") or {}
-        user_id = metadata.get("user_id")
+        user_id = p.get("external_reference") or metadata.get("user_id")
 
         if user_id:
             _store_transaction(str(user_id), str(data_id), {
