@@ -25,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # =========================
 # TAG INTERNA DE VERSÃO
 # =========================
-MAIN_INTERNAL_VERSION = "1.16"
+MAIN_INTERNAL_VERSION = "1.17"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
@@ -394,27 +394,30 @@ Você é a "Dra. Cláusula", uma especialista em análise de contratos. Sua tare
         email_erro: Optional[str] = None
         assunto = "Resultado da Análise Contratual - Dra. Cláusula"
 
-        try:
-            # opcional: anexar o PDF original
-            attachment_bytes = content if content else None
-            email_ok, email_err = _send_email_brevo(
-                to_email=email,
-                subject=assunto,
-                html=resposta_html,
-                attachment_name=arquivo.filename,
-                attachment_bytes=attachment_bytes,
-            )
-            email_enviado = bool(email_ok)
-            email_erro = email_err
-            if email_ok:
-                logging.info(f"E-mail enviado via Brevo com sucesso para {email}")
-            else:
-                logging.warning(f"E-mail não enviado via Brevo: {email_err}")
-        except Exception as e:
-            # NÃO derruba o endpoint
-            email_enviado = False
-            email_erro = str(e)
-            logging.exception(f"Falha ao enviar e-mail (Brevo): {email_erro}")
+        if not BREVO_API_KEY:
+            logging.info("Brevo desabilitado: BREVO_API_KEY ausente (envio de e-mail ignorado).")
+        else:
+            try:
+                # opcional: anexar o PDF original
+                attachment_bytes = content if content else None
+                email_ok, email_err = _send_email_brevo(
+                    to_email=email,
+                    subject=assunto,
+                    html=resposta_html,
+                    attachment_name=arquivo.filename,
+                    attachment_bytes=attachment_bytes,
+                )
+                email_enviado = bool(email_ok)
+                email_erro = email_err
+                if email_ok:
+                    logging.info(f"E-mail enviado via Brevo com sucesso para {email}")
+                else:
+                    logging.warning(f"E-mail não enviado via Brevo: {email_err}")
+            except Exception as e:
+                # NÃO derruba o endpoint
+                email_enviado = False
+                email_erro = str(e)
+                logging.exception(f"Falha ao enviar e-mail (Brevo): {email_erro}")
 
         return {
             "ok": True,
