@@ -11,32 +11,44 @@ try:
 except Exception:
     pass  # Em produção (Render), ignora
 
-API_GEMINI_INTERNAL_VERSION = "1.02"
+API_GEMINI_INTERNAL_VERSION = "1.03"
 
 # ===============================
 # Configuração da API Gemini
 # ===============================
 API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not API_KEY:
-    raise RuntimeError(
-        "GEMINI_API_KEY não definida. "
-        "Configure no .env (local) ou no Render > Environment."
-    )
-
-genai.configure(api_key=API_KEY)
-
 MODEL_NAME = os.getenv("GEMINI_MODEL", "gemini-flash-latest")
 
-try:
-    _gemini_model = genai.GenerativeModel(MODEL_NAME)
-except Exception as e:
-    raise RuntimeError(
-        f"Erro ao inicializar o modelo Gemini '{MODEL_NAME}': {e}"
-    )
+_gemini_model = None
+_gemini_init_error = None
+
+def _get_model():
+    """Inicializa o modelo do Gemini sob demanda.
+    Não levanta exceção no import para não derrubar a API inteira se faltar chave.
+    """
+    global _gemini_model, _gemini_init_error
+
+    if _gemini_model is not None:
+        return _gemini_model
+
+    if _gemini_init_error is not None:
+        return None
+
+    if not API_KEY:
+        _gemini_init_error = "GEMINI_API_KEY não definida. Configure no Render > Environment."
+        return None
+
+    try:
+        genai.configure(api_key=API_KEY)
+        _gemini_model = genai.GenerativeModel(MODEL_NAME)
+        return _gemini_model
+    except Exception as e:
+        _gemini_init_error = f"Erro ao inicializar o modelo Gemini '{MODEL_NAME}': {e}"
+        return None
 
 # ===============================
 # Leitura de PDF
+
 # ===============================
 def _read_pdf_content(pdf_file_path: str):
     try:
@@ -66,8 +78,12 @@ def processar_pdf_com_gemini(prompt: str, pdf_file_path: str) -> str:
         f"{pdf_text}"
     )
 
+    model = _get_model()
+    if model is None:
+        return f"Erro ao gerar resposta do Gemini: {_gemini_init_error or 'modelo indisponível.'}"
+
     try:
-        response = _gemini_model.generate_content(full_prompt)
+        response = model.generate_content(full_prompt)
         return response.text
     except Exception as e:
         return f"Erro ao gerar resposta do Gemini: {e}"
