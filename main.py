@@ -25,7 +25,7 @@ from fastapi.middleware.cors import CORSMiddleware
 # =========================
 # TAG INTERNA DE VERSÃO
 # =========================
-MAIN_INTERNAL_VERSION = "1.15"
+MAIN_INTERNAL_VERSION = "1.16"
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
